@@ -204,12 +204,12 @@ Get admin password:
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
 
-Access UI at http://argocd.localhost
+Access UI at <http://argocd.localhost>
 
 CLI login:
 
 ```bash
-argocd login argocd.localhost --grpc-web --insecure
+argocd login argocd.localhost --grpc-web --plaintext
 ```
 
 ## Cleanup

@@ -12,6 +12,10 @@ argo-cd:
     params:
       server.insecure: true
 
+  server:
+    extraArgs:
+      - --grpc-web
+
 httproute:
   enabled: true
   gateway:
