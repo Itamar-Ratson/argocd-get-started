@@ -113,6 +113,16 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https
+      protocol: HTTPS
+      port: 8443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: argocd-tls
+      allowedRoutes:
+        namespaces:
+          from: All
 ```
 
 Build and install:
@@ -209,7 +219,7 @@ Access UI at <http://argocd.localhost>
 CLI login:
 
 ```bash
-argocd login argocd.localhost --grpc-web --plaintext
+argocd login argocd.localhost --grpc-web --insecure
 ```
 
 ## Cleanup
