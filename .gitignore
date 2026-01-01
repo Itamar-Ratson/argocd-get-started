@@ -9,7 +9,7 @@
 !Chart.lock
 
 # Allow the directories
-!helm/
+#!helm/
 
 # Allow file types
 !*.yaml
