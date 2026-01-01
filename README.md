@@ -1,6 +1,6 @@
-# ArgoCD Getting Started Guide
+# ArgoCD Getting Started Guide (Gateway API)
 
-Local development setup using KinD, Traefik, and Helm.
+Local development setup using KinD, Traefik, Helm, and Kubernetes Gateway API.
 
 ## Prerequisites
 
@@ -38,7 +38,19 @@ nodes:
 kind create cluster --config kind-config.yaml
 ```
 
-## 2. Install Traefik
+## 2. Install Gateway API CRDs
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+```
+
+Verify installation:
+
+```bash
+kubectl get crd | grep gateway
+```
+
+## 3. Install Traefik
 
 Create `traefik-values.yaml`:
 
@@ -58,6 +70,13 @@ tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Equal
     effect: NoSchedule
+
+providers:
+  kubernetesGateway:
+    enabled: true
+
+gateway:
+  enabled: false
 ```
 
 ```bash
@@ -66,7 +85,7 @@ helm repo update
 helm install traefik traefik/traefik -n traefik --create-namespace -f traefik-values.yaml
 ```
 
-## 3. Install ArgoCD
+## 4. Install ArgoCD
 
 Create `argocd-values.yaml`:
 
@@ -93,33 +112,79 @@ helm install argocd argo/argo-cd -n argocd -f argocd-values.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
 ```
 
-## 4. Create IngressRoute
+## 5. Create GatewayClass, Gateway, and HTTPRoute
 
-Create `argocd-ingress.yaml`:
+Create `gateway-class.yaml`:
 
 ```yaml
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+spec:
+  controllerName: traefik.io/gateway-controller
+```
+
+Create `gateway.yaml`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: traefik-gateway
+  namespace: traefik
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+```
+
+Create `argocd-httproute.yaml`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: argocd-server
   namespace: argocd
 spec:
-  entryPoints:
-    - websecure
-  routes:
-    - kind: Rule
-      match: Host(`argocd.localhost`)
-      services:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: traefik
+  hostnames:
+    - argocd.localhost
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
         - name: argocd-server
           port: 80
-  tls: {}
 ```
+
+Apply resources:
 
 ```bash
-kubectl apply -f argocd-ingress.yaml
+kubectl apply -f gateway-class.yaml
+kubectl apply -f gateway.yaml
+kubectl apply -f argocd-httproute.yaml
 ```
 
-## 5. Access ArgoCD
+Verify:
+
+```bash
+kubectl get gatewayclass
+kubectl get gateway -n traefik
+kubectl get httproute -n argocd
+```
+
+## 6. Access ArgoCD
 
 Get admin password:
 
@@ -127,7 +192,7 @@ Get admin password:
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
 
-Access UI at https://argocd.localhost (accept self-signed cert warning).
+Access UI at http://argocd.localhost
 
 CLI login:
 
