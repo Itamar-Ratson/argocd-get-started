@@ -14,10 +14,6 @@ argo-cd:
     secret:
       createSecret: false
 
-  server:
-    extraArgs:
-      - --grpc-web
-
 httproute:
   enabled: true
   gateway:
