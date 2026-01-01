@@ -1,6 +1,6 @@
 # ArgoCD Getting Started Guide (Gateway API)
 
-Local development setup using KinD, Traefik, Helm, and Kubernetes Gateway API.
+Local development setup using KinD, Traefik, Helm, cert-manager, and Kubernetes Gateway API.
 
 ## Prerequisites
 
@@ -18,20 +18,20 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: argocd-dev
 nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-    protocol: TCP
-  - containerPort: 443
-    hostPort: 443
-    protocol: TCP
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
 ```
 
 ```bash
@@ -44,9 +44,56 @@ kind create cluster --config kind-config.yaml
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
 ```
 
-## 3. Create Traefik Chart
+## 3. Install cert-manager
 
-Create `charts/traefik/Chart.yaml`:
+Create `helm/cert-manager/Chart.yaml`:
+
+```yaml
+apiVersion: v2
+name: cert-manager
+version: 1.0.0
+description: cert-manager with self-signed ClusterIssuer
+dependencies:
+  - name: cert-manager
+    version: "1.17.1"
+    repository: "https://charts.jetstack.io"
+```
+
+Create `helm/cert-manager/values.yaml`:
+
+```yaml
+cert-manager:
+  crds:
+    enabled: true
+```
+
+Create `helm/cert-manager/templates/cluster-issuer.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+spec:
+  selfSigned: {}
+```
+
+Build and install:
+
+```bash
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm dependency build ./helm/cert-manager
+helm upgrade --install cert-manager ./helm/cert-manager -n cert-manager --create-namespace
+kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=120s
+```
+
+## 4. Install Traefik
+
+Create `helm/traefik/Chart.yaml`:
 
 ```yaml
 apiVersion: v2
@@ -59,7 +106,7 @@ dependencies:
     repository: "https://traefik.github.io/charts"
 ```
 
-Create `charts/traefik/values.yaml`:
+Create `helm/traefik/values.yaml`:
 
 ```yaml
 traefik:
@@ -85,7 +132,7 @@ traefik:
     enabled: false
 ```
 
-Create `charts/traefik/templates/gateway-class.yaml`:
+Create `helm/traefik/templates/gateway-class.yaml`:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -96,7 +143,7 @@ spec:
   controllerName: traefik.io/gateway-controller
 ```
 
-Create `charts/traefik/templates/gateway.yaml`:
+Create `helm/traefik/templates/gateway.yaml`:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -119,16 +166,35 @@ spec:
           from: All
 ```
 
+Create `helm/traefik/templates/certificate.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-tls
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: argocd-tls
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+  dnsNames:
+    - argocd.localhost
+```
+
 Build and install:
 
 ```bash
-helm dependency build ./charts/traefik
-helm upgrade --install traefik ./charts/traefik -n traefik --create-namespace
+helm repo add traefik https://traefik.github.io/charts
+helm repo update
+helm dependency build ./helm/traefik
+helm upgrade --install traefik ./helm/traefik -n traefik --create-namespace
 ```
 
-## 4. Create ArgoCD Chart
+## 5. Install ArgoCD
 
-Create `charts/argocd/Chart.yaml`:
+Create `helm/argocd/Chart.yaml`:
 
 ```yaml
 apiVersion: v2
@@ -141,7 +207,7 @@ dependencies:
     repository: "https://argoproj.github.io/argo-helm"
 ```
 
-Create `charts/argocd/values.yaml`:
+Create `helm/argocd/values.yaml`:
 
 ```yaml
 argo-cd:
@@ -158,6 +224,10 @@ argo-cd:
     params:
       server.insecure: true
 
+  server:
+    extraArgs:
+      - --grpc-web
+
 httproute:
   enabled: true
   gateway:
@@ -166,7 +236,7 @@ httproute:
   hostname: argocd.localhost
 ```
 
-Create `charts/argocd/templates/httproute.yaml`:
+Create `helm/argocd/templates/httproute.yaml`:
 
 ```yaml
 {{- if .Values.httproute.enabled }}
@@ -195,12 +265,14 @@ spec:
 Build and install:
 
 ```bash
-helm dependency build ./charts/argocd
-helm upgrade --install argocd ./charts/argocd -n argocd --create-namespace
-kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm dependency build ./helm/argocd
+helm upgrade --install argocd ./helm/argocd -n argocd --create-namespace
+kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s
 ```
 
-## 5. Access ArgoCD
+## 6. Access ArgoCD
 
 Get admin password:
 
@@ -208,7 +280,7 @@ Get admin password:
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
 
-Access UI at <http://argocd.localhost>
+Access UI at <https://argocd.localhost> (accept the self-signed certificate warning).
 
 CLI login:
 
