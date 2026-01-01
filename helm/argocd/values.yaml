@@ -1,0 +1,20 @@
+argo-cd:
+  dex:
+    enabled: false
+
+  notifications:
+    enabled: false
+
+  applicationSet:
+    enabled: false
+
+  configs:
+    params:
+      server.insecure: true
+
+httproute:
+  enabled: true
+  gateway:
+    name: traefik-gateway
+    namespace: traefik
+  hostname: argocd.localhost

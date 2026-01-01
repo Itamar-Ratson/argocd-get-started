@@ -1,0 +1,21 @@
+traefik:
+  ports:
+    web:
+      hostPort: 80
+    websecure:
+      hostPort: 443
+
+  nodeSelector:
+    ingress-ready: "true"
+
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Equal
+      effect: NoSchedule
+
+  providers:
+    kubernetesGateway:
+      enabled: true
+
+  gateway:
+    enabled: false

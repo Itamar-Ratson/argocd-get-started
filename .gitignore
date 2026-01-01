@@ -1,12 +1,16 @@
 # Ignore everything
 *
 
-# Allow folders
+# Allow nested directories
 !**/
+
+# Allow specific files and directories
+!.gitignore
+!Chart.lock
+
+# Allow the directories
 !helm/
 
-# Allow specific files and folders
-!.gitignore
-!README.md
-!kind-config.yaml
-
+# Allow file types
+!*.yaml
+!*.md

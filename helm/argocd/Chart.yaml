@@ -1,0 +1,8 @@
+apiVersion: v2
+name: argocd
+version: 1.0.0
+description: ArgoCD with Gateway API HTTPRoute
+dependencies:
+  - name: argo-cd
+    version: "7.7.16"
+    repository: "https://argoproj.github.io/argo-helm"
