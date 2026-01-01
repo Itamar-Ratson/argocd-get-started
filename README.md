@@ -273,10 +273,6 @@ argo-cd:
     secret:
       createSecret: false
 
-  server:
-    extraArgs:
-      - --grpc-web
-
 httproute:
   enabled: true
   gateway:
@@ -313,6 +309,31 @@ spec:
 
 ### Set Custom Admin Password
 
+Create `example.argocd-admin-secret.yaml`:
+
+```yaml
+# Example ArgoCD admin password secret
+# 
+# Usage:
+#   1. Copy this file: cp example.argocd-admin-secret.yaml argocd-admin-secret.yaml
+#   2. Generate a bcrypt hash: htpasswd -nbBC 10 "" "your-password" | tr -d ':\n' | sed 's/$2y/$2a/'
+#   3. Generate a secret key: openssl rand -base64 32
+#   4. Replace the values below with your hash and secret key
+#   5. Seal it: kubeseal --controller-name sealed-secrets --controller-namespace sealed-secrets -o yaml < argocd-admin-secret.yaml > helm/argocd/templates/sealed-argocd-secret.yaml
+#   6. Delete the plain file: rm argocd-admin-secret.yaml
+#
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-secret
+  namespace: argocd
+type: Opaque
+stringData:
+  admin.password: "$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RBER9bh9.a8eWy"  # default: admin
+  admin.passwordMtime: "2024-01-01T00:00:00Z"
+  server.secretkey: "REPLACE_WITH_OUTPUT_OF_openssl_rand_-base64_32"
+```
+
 Create the ArgoCD admin secret using Sealed Secrets:
 
 ```bash
@@ -325,7 +346,13 @@ Generate a bcrypt hash for your password:
 htpasswd -nbBC 10 "" "your-password-here" | tr -d ':\n' | sed 's/$2y/$2a/'
 ```
 
-Edit `argocd-admin-secret.yaml` and replace the `admin.password` value with your hash.
+Generate a secret key for JWT signing:
+
+```bash
+openssl rand -base64 32
+```
+
+Edit `argocd-admin-secret.yaml` and replace `admin.password` with your hash and `server.secretkey` with your generated key.
 
 Seal the secret:
 
@@ -358,7 +385,7 @@ Login with username `admin` and the password you set in the sealed secret.
 CLI login:
 
 ```bash
-argocd login argocd.localhost --grpc-web --insecure
+argocd login argocd.localhost --grpc-web
 ```
 
 ## Cleanup
