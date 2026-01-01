@@ -55,26 +55,29 @@ kubectl get crd | grep gateway
 Create `traefik-values.yaml`:
 
 ```yaml
-hostNetwork: true
-
+# Map host ports directly to Traefik's container ports
 ports:
   web:
-    port: 80
+    hostPort: 80      # Host port 80 -> container port 8000 (Traefik's default)
   websecure:
-    port: 443
+    hostPort: 443     # Host port 443 -> container port 8443 (Traefik's default)
 
+# Schedule on the node with KinD's extraPortMappings
 nodeSelector:
   ingress-ready: "true"
 
+# Allow scheduling on control-plane node
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Equal
     effect: NoSchedule
 
+# Enable Gateway API provider
 providers:
   kubernetesGateway:
     enabled: true
 
+# We create our own Gateway resource
 gateway:
   enabled: false
 ```
@@ -138,7 +141,7 @@ spec:
   listeners:
     - name: http
       protocol: HTTP
-      port: 80
+      port: 8000
       allowedRoutes:
         namespaces:
           from: All
@@ -192,7 +195,7 @@ Get admin password:
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
 
-Access UI at http://argocd.localhost
+Access UI at <http://argocd.localhost>
 
 CLI login:
 
