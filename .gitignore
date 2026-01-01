@@ -1,0 +1,9 @@
+# Ignore everything
+*
+
+# Allow specific files and folders
+!.gitignore
+!README.md
+!kind-config.yaml
+!helm
+
