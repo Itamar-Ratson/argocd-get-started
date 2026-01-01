@@ -1,9 +1,15 @@
 traefik:
+  hostNetwork: true
+  
+  # When using hostNetwork, ports are bound directly on the host
+  # so we use the actual port numbers (80, 443)
   ports:
     web:
-      hostPort: 80
+      port: 80
+      hostPort: null  # Not needed with hostNetwork
     websecure:
-      hostPort: 443
+      port: 443
+      hostPort: null
 
   nodeSelector:
     ingress-ready: "true"
@@ -19,3 +25,7 @@ traefik:
 
   gateway:
     enabled: false
+
+  deployment:
+    strategy:
+      type: Recreate

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: cilium
+version: 1.0.0
+description: Cilium CNI with WireGuard encryption
+dependencies:
+  - name: cilium
+    version: "1.16.5"
+    repository: "https://helm.cilium.io"
