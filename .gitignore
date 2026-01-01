@@ -2,6 +2,7 @@
 *
 
 # Allow folders
+!**/
 !helm/
 
 # Allow specific files and folders
